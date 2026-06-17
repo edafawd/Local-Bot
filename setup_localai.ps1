@@ -613,19 +613,53 @@ class _MessageBubble extends StatelessWidget {
               ),
               child: message.isStreaming && message.content.isEmpty
                   ? _TypingIndicator()
-                  : isUser
-                      ? Text(message.content,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white))
-                      : MarkdownBody(
-                          data: message.content + (message.isStreaming ? ' ▋' : ''),
-                          styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                            p: theme.textTheme.bodyMedium,
-                            code: theme.textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                              backgroundColor: theme.colorScheme.surface,
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SelectionArea(
+                          child: isUser
+                              ? Text(message.content,
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white))
+                              : MarkdownBody(
+                                  data: message.content + (message.isStreaming ? ' ▋' : ''),
+                                  selectable: true,
+                                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                                    p: theme.textTheme.bodyMedium,
+                                    code: theme.textTheme.bodySmall?.copyWith(
+                                      fontFamily: 'monospace',
+                                      backgroundColor: theme.colorScheme.surface,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                        if (!message.isStreaming) ...[
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: message.content));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Copied to clipboard'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.copy, size: 12,
+                                    color: isUser ? Colors.white70 : theme.colorScheme.outline),
+                                const SizedBox(width: 4),
+                                Text('Copy',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                        color: isUser ? Colors.white70 : theme.colorScheme.outline)),
+                              ],
                             ),
                           ),
-                        ),
+                        ],
+                      ],
+                    ),
             ),
           ),
           if (isUser) ...[
