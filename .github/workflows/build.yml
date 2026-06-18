@@ -28,19 +28,96 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Override macOS deployment target to 10.15 (Catalina)
+        run: |
+          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = .*/MACOSX_DEPLOYMENT_TARGET = 10.15;/' macos/Runner.xcodeproj/project.pbxproj
+          if [ -f macos/Podfile ]; then
+            sed -i '' "s/platform :osx, '.*'/platform :osx, '10.15'/" macos/Podfile
+          fi
+
       - name: Build macOS app
         run: flutter build macos --release
 
-      - name: Zip the app
+      - name: Zip macOS app
         run: |
           cd build/macos/Build/Products/Release
-          zip -r Local-Bot.app.macOS.zip local_ai.app
+          zip -r Local-Bot.macOS.zip local_ai.app
 
-      - name: Upload artifact
+      - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
-          path: build/macos/Build/Products/Release/Local-Bot.app.macOS.zip
+          path: build/macos/Build/Products/Release/Local-Bot.macOS.zip
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create iOS platform files
+        run: flutter create --platforms=ios .
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build iOS (no code sign — unsigned IPA)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r Local-Bot.iOS.ipa Payload
+          rm -rf Payload
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: Local-Bot.iOS.ipa
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android platform files
+        run: flutter create --platforms=android .
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Build Android App Bundle (AAB)
+        run: flutter build appbundle --release
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload Android AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
 
   build-windows:
     runs-on: windows-latest
@@ -63,23 +140,38 @@ jobs:
       - name: Build Windows app
         run: flutter build windows --release
 
-      - name: Zip the app
-        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath Local-Bot.app.Windows.zip
+      - name: Zip Windows app
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath Local-Bot.Windows.zip
 
-      - name: Upload artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: Local-Bot.app.Windows.zip
+          path: Local-Bot.Windows.zip
 
   release:
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-ios, build-android, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: macos-build
+
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-build
+
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+
+      - name: Download Android AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
@@ -91,8 +183,20 @@ jobs:
         with:
           tag_name: latest-build
           name: Local-Bot Latest Build
+          body: |
+            ## Downloads
+            | Platform | File | Notes |
+            |---|---|---|
+            | Windows | Local-Bot.Windows.zip | Extract and run local_ai.exe |
+            | macOS | Local-Bot.macOS.zip | Right-click → Open first time |
+            | iOS | Local-Bot.iOS.ipa | Unsigned — sideload via AltStore or Sideloadly |
+            | Android | app-release.apk | Enable "Install unknown apps" in settings |
+            | Android | app-release.aab | For Google Play Store upload |
           files: |
-            Local-Bot.app.macOS.zip
-            Local-Bot.app.Windows.zip
+            Local-Bot.macOS.zip
+            Local-Bot.iOS.ipa
+            app-release.apk
+            app-release.aab
+            Local-Bot.Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
