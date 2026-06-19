@@ -101,14 +101,26 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Force fix Gradle wrapper
+      - name: Force fix Gradle wrapper (python, guaranteed reliable)
         run: |
-          echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
-          echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
-          echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+          python3 -c "
+          content = '''distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.7-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          '''
+          with open('android/gradle/wrapper/gradle-wrapper.properties', 'w') as f:
+              f.write(content)
+          print(open('android/gradle/wrapper/gradle-wrapper.properties').read())
+          "
+
+      - name: VERIFY gradle wrapper right before build
+        run: |
+          echo "=== gradle-wrapper.properties content ==="
           cat android/gradle/wrapper/gradle-wrapper.properties
+          echo "=== find ALL gradle-wrapper.properties files in repo ==="
+          find . -name "gradle-wrapper.properties" -exec echo "FILE: {}" \; -exec cat {} \;
 
       - name: Build Android APK
         run: flutter build apk --release
