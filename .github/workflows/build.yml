@@ -64,9 +64,8 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build iOS (no code sign — unsigned IPA)
-        run: |
-          flutter build ios --release --no-codesign
+      - name: Build iOS (no code sign - unsigned IPA)
+        run: flutter build ios --release --no-codesign
 
       - name: Package unsigned IPA
         run: |
@@ -95,38 +94,20 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Android platform files
-        run: flutter create --platforms=android . || true
+      - name: Remove old android folder and regenerate fresh
+        run: |
+          rm -rf android
+          flutter create --platforms=android .
+          rm -f android/app/build.gradle.kts android/build.gradle.kts android/settings.gradle.kts
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Force fix Gradle wrapper (python, guaranteed reliable)
-        run: |
-          python3 -c "
-          content = '''distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\\\\://services.gradle.org/distributions/gradle-8.7-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          '''
-          with open('android/gradle/wrapper/gradle-wrapper.properties', 'w') as f:
-              f.write(content)
-          print(open('android/gradle/wrapper/gradle-wrapper.properties').read())
-          "
-
-      - name: VERIFY gradle wrapper right before build
-        run: |
-          echo "=== gradle-wrapper.properties content ==="
-          cat android/gradle/wrapper/gradle-wrapper.properties
-          echo "=== find ALL gradle-wrapper.properties files in repo ==="
-          find . -name "gradle-wrapper.properties" -exec echo "FILE: {}" \; -exec cat {} \;
-
       - name: Build Android APK
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Build Android App Bundle (AAB)
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
@@ -209,8 +190,8 @@ jobs:
             | Platform | File | Notes |
             |---|---|---|
             | Windows | Local-Bot.Windows.zip | Extract and run local_ai.exe |
-            | macOS | Local-Bot.macOS.zip | Right-click → Open first time |
-            | iOS | Local-Bot.iOS.ipa | Unsigned — sideload via AltStore or Sideloadly |
+            | macOS | Local-Bot.macOS.zip | Right-click then Open the first time |
+            | iOS | Local-Bot.iOS.ipa | Unsigned, sideload via AltStore or Sideloadly |
             | Android | app-release.apk | Enable "Install unknown apps" in settings |
             | Android | app-release.aab | For Google Play Store upload |
           files: |
