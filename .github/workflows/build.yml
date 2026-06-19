@@ -97,8 +97,11 @@ jobs:
       - name: Remove old android folder and regenerate fresh
         run: |
           rm -rf android
-          flutter create --platforms=android .
+          ls -la | grep android || echo "android folder confirmed deleted"
+          flutter create --platforms=android . --org com.localai --project-name local_ai
           rm -f android/app/build.gradle.kts android/build.gradle.kts android/settings.gradle.kts
+          echo "=== AndroidManifest.xml content ==="
+          cat android/app/src/main/AndroidManifest.xml
 
       - name: Get dependencies
         run: flutter pub get
