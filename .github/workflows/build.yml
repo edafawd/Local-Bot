@@ -90,6 +90,23 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35, NDK 28.0.12433566, CMake 3.31.0
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-35"
+          sdkmanager "ndk;28.0.12433566"
+          sdkmanager "cmake;3.31.0" || echo "cmake;3.31.0 not in sdkmanager, will rely on system cmake"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.0.12433566" >> $GITHUB_ENV
+          echo "NDK_VERSION=28.0.12433566" >> $GITHUB_ENV
+          echo "=== Installed NDK versions ==="
+          ls "$ANDROID_SDK_ROOT/ndk" || true
+          echo "=== Installed CMake versions (via sdkmanager) ==="
+          ls "$ANDROID_SDK_ROOT/cmake" 2>/dev/null || echo "none via sdkmanager"
+          cmake --version
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -98,6 +115,15 @@ jobs:
         run: |
           rm -rf android
           flutter create --platforms=android . --org com.localai --project-name local_ai
+
+      - name: Pin NDK version in build.gradle
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i "/android {/a\\    ndkVersion = \"28.0.12433566\"" android/app/build.gradle.kts
+          fi
+          if [ -f android/app/build.gradle ]; then
+            sed -i "/android {/a\\    ndkVersion '28.0.12433566'" android/app/build.gradle
+          fi
 
       - name: Get dependencies
         run: flutter pub get
